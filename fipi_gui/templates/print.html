@@ -14,6 +14,11 @@
       data-tasks-url="{{ url_for('tasks_json') }}">
   <div class="print-toolbar">
     <a href="{{ url_for('index') }}" data-back-to-list>← К списку</a>
+    <form class="print-options" data-print-options>
+      <label><input type="checkbox" name="solutions" value="1"> решения</label>
+      <label><input type="checkbox" name="answers" value="1"> ответы в конце</label>
+      <label><input type="checkbox" name="grid" value="1"> поле для решения</label>
+    </form>
     <button type="button" data-action="print">Печать / сохранить PDF</button>
   </div>
 

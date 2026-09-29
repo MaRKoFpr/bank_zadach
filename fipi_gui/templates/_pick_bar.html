@@ -1,0 +1,40 @@
+<div class="pick-bar" id="pick-bar"
+     data-index-url="{{ url_for('index') }}"
+     data-print-url="{{ url_for('print_page') }}">
+  <div class="pick-bar-info">
+    <span class="pick-bar-label">Подборка</span>
+    <strong data-pick-count>0</strong>
+  </div>
+  <div class="pick-bar-actions">
+    <button class="button small primary" type="button" data-action="pick-show" data-needs-pick>Открыть</button>
+    <button class="button small" type="button" data-action="pick-print" data-needs-pick>Печать</button>
+    <button class="button small" type="button" data-action="pick-save" data-needs-pick>Код подборки</button>
+    <button class="button small ghost" type="button" data-action="pick-open">Открыть по коду</button>
+    <button class="button small ghost" type="button" data-action="pick-clear" data-needs-pick>Очистить</button>
+  </div>
+</div>
+
+<dialog class="pick-dialog" id="pick-dialog">
+  <form method="dialog" class="pick-dialog-body" data-mode="save">
+    <div data-dialog-save>
+      <h3>Код подборки</h3>
+      <p class="muted">По этому коду подборка восстанавливается на любом устройстве — в том же порядке задач.</p>
+      <output class="pick-code" data-code></output>
+      <div class="pick-dialog-row">
+        <button class="button small primary" type="button" data-action="copy-code">Скопировать код</button>
+        <button class="button small" type="button" data-action="copy-link">Скопировать ссылку</button>
+        <span class="save-status" data-copy-status></span>
+      </div>
+    </div>
+    <div data-dialog-open>
+      <h3>Открыть подборку по коду</h3>
+      <p class="muted">Регистр, пробелы и дефисы не важны.</p>
+      <input name="code" autocomplete="off" spellcheck="false" placeholder="Например: 1B4G-…">
+      <p class="pick-error" data-code-error></p>
+      <div class="pick-dialog-row">
+        <button class="button small primary" type="button" data-action="apply-code">Открыть</button>
+      </div>
+    </div>
+    <button class="pick-dialog-close" value="close" aria-label="Закрыть">×</button>
+  </form>
+</dialog>

@@ -152,3 +152,59 @@ body {
 @media print {
   .print-toolbar { display: none; }
 }
+
+.print-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-right: auto;
+  margin-left: 18px;
+}
+
+.print-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+/* ---------- Поле для решения: тетрадная клетка 5 мм ---------- */
+.work-grid {
+  margin-top: 6pt;
+  border: 0.75pt solid #a9bbd9;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cpath d='M20 0H0V20' fill='none' stroke='%23c3d0e6' stroke-width='1'/%3E%3C/svg%3E");
+  background-size: 5mm 5mm;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  break-inside: avoid;
+}
+
+/* Первая часть: условие + клетка вместе занимают половину листа A4
+   (печатная область ≈ 267 мм, минус шапка на первом листе), клетка растягивается
+   на всё место под условием, но не меньше 45 мм */
+.work-grid-half {
+  flex: 1 1 auto;
+  min-height: 45mm;
+}
+
+/* Вторая часть: отдельный целый лист */
+.work-grid-page {
+  height: 255mm;
+  break-before: page;
+}
+
+@media screen {
+  .work-grid-page { margin-top: 18px; }
+}
+
+/* Условие и его поле не разрываем: если не помещаются — вместе на следующий лист */
+.task-with-grid {
+  display: flex;
+  flex-direction: column;
+  min-height: 120mm;
+  break-inside: avoid;
+}
+
+/* Условие никогда не режем между листами (таблицы, рисунки) */
+.task .statement { break-inside: avoid; }

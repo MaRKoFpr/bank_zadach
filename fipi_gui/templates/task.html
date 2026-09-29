@@ -11,6 +11,7 @@
       <h1>{{ title }}</h1>
     </div>
     <div class="chips">
+      <label class="check pick-check"><input type="checkbox" data-pick="{{ task_id }}"> В подборку</label>
       <span class="chip">{{ task.properties.get("Тип ответа", "—") }}</span>
       {% if admin %}
         <span class="chip {% if task.classification_status == 'uncertain' %}warning{% else %}success{% endif %}">
@@ -137,4 +138,6 @@
   </details>
   {% endif %}
 </article>
+
+{% include "_pick_bar.html" %}
 {% endblock %}

@@ -80,6 +80,9 @@ def main() -> int:
     size = sum(f.stat().st_size for f in out.rglob("*") if f.is_file()) / 1e6
     print(f"Готово: {out}  ({len(site.BY_GUID)} задач, {size:.1f} МБ, префикс '{base or '/'}')")
     print(f"Решений: {sum(1 for g in site.BY_GUID if site.has_solution(g))}")
+    if site._task_ids_changed:
+        print("Внимание: у новых задач нет постоянных номеров в data/task_ids.json — "
+              "запусти `python app.py` локально и закоммить файл, иначе коды подборок могут разъехаться")
     if missing:
         print(f"Внимание: нет {missing} картинок — запусти `python fetch_images.py` там, где открывается ege.fipi.ru")
     return 0

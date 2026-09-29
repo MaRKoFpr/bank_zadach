@@ -616,3 +616,113 @@ textarea {
   .filters-toggle { display: inline-flex; }
   .filters:not(.filters-open) .field-extra { display: none; }
 }
+
+/* ---------- Подборка ---------- */
+.pick-check {
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.task-card .pick-check input:checked + *,
+.pick-check:has(input:checked) { font-weight: 800; }
+
+.detail-head .pick-check { margin-right: 6px; }
+
+.filters.is-muted { opacity: .55; }
+
+.pick-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  border: 1px solid #cddafc;
+}
+
+.pick-banner strong, .pick-banner span { display: block; }
+.pick-banner span { color: var(--muted); font-size: 13px; }
+
+.pick-bar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 15;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 24px;
+  padding: 10px 14px;
+  background: rgba(21, 23, 26, .94);
+  color: #fff;
+  border-radius: 16px;
+  box-shadow: 0 14px 40px rgba(20, 28, 45, .25);
+}
+
+.pick-bar-info { display: grid; line-height: 1.2; }
+.pick-bar-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #aab1bd;
+  font-weight: 800;
+}
+
+.pick-bar-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.pick-bar .button { border-color: #3a3f47; background: #24272c; color: #fff; }
+.pick-bar .button.primary { background: var(--accent); border-color: var(--accent); }
+.pick-bar .button.ghost { background: transparent; }
+.pick-bar .button[disabled] { display: none; }
+.pick-bar.is-empty { opacity: .9; }
+
+.pick-dialog {
+  width: min(520px, calc(100% - 32px));
+  border: 0;
+  border-radius: var(--radius);
+  padding: 0;
+  box-shadow: 0 24px 60px rgba(20, 28, 45, .3);
+}
+
+.pick-dialog::backdrop { background: rgba(21, 23, 26, .45); }
+.pick-dialog-body { position: relative; padding: 22px 24px; }
+.pick-dialog h3 { margin: 0 0 4px; font-size: 20px; }
+.pick-dialog p { margin: 0 0 12px; font-size: 14px; }
+
+.pick-code {
+  display: block;
+  padding: 14px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: #f0f3fa;
+  font: 700 18px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: .04em;
+  word-break: break-all;
+  user-select: all;
+}
+
+.pick-dialog input { margin-bottom: 6px; font-family: ui-monospace, Consolas, monospace; text-transform: uppercase; }
+.pick-error { color: #b42318; min-height: 1.2em; }
+.pick-dialog-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.pick-dialog-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 22px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .pick-bar { bottom: 8px; padding: 8px 10px; }
+  .pick-bar-actions { margin-left: 0; }
+  .pick-banner { flex-direction: column; align-items: flex-start; }
+}

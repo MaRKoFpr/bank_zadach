@@ -88,6 +88,9 @@
   </div>
   <label class="check"><input type="checkbox" name="solutions" value="1"> с решениями</label>
   <label class="check"><input type="checkbox" name="answers" value="1"> ответы в конце</label>
+  <label class="check" title="Клетка после условия: ½ страницы для задач с кратким ответом, целая страница — для развёрнутого ответа">
+    <input type="checkbox" name="grid" value="1"> поле для решения
+  </label>
   {% if pdf_download %}
     <button class="button primary" type="submit" data-export="pdf">Скачать PDF</button>
     <button class="button ghost" type="submit" data-export="print">Версия для печати</button>
@@ -96,6 +99,14 @@
     <span class="export-note">Откроется версия для печати — выбери «Сохранить как PDF» в окне печати.</span>
   {% endif %}
 </form>
+
+<div class="pick-banner" id="pick-banner" hidden>
+  <div>
+    <strong>Показана подборка</strong>
+    <span>Задачи в порядке добавления. Фильтры выше не действуют.</span>
+  </div>
+  <button class="button small ghost" type="button" data-action="show-all">← Ко всем задачам</button>
+</div>
 
 <div class="results-bar">
   <strong data-total>Загрузка задач…</strong>
@@ -113,4 +124,6 @@
   <span data-pages></span>
   <button class="button ghost" type="button" data-page="next">Вперёд →</button>
 </nav>
+
+{% include "_pick_bar.html" %}
 {% endblock %}

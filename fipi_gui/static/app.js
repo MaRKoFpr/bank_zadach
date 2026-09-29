@@ -50,6 +50,7 @@ async function loadTasks(url) {
 }
 
 const FILTER_KEYS = ["q", "number", "status", "type", "solution"];
+const PRINT_OPTIONS = ["solutions", "answers", "grid"];
 const NUMBER_ORDER = (n) => (/^\d+$/.test(n) ? Number(n) : n === "ege_2026_12" ? 100 : 200);
 
 function readParams(search = location.search) {
@@ -84,6 +85,138 @@ function selectionTitle(f) {
   if (f.type) title += ` · ${f.type.toLowerCase()}`;
   if (f.q) title += ` · «${f.q}»`;
   return title;
+}
+
+// ---------------------------------------------------------------------------
+// Код подборки
+//
+// Задача идентифицируется постоянным номером (data/task_ids.json), поэтому код
+// не зависит от порядка задач в базе и переживает её обновление.
+// Битовый формат (старшие биты первыми):
+//   версия (5) | ширина номера W−1 (4) | число задач N−1 (11) | N номеров по W бит | контроль (15)
+// дополнение нулями до кратного 5 и запись в base32 Крокфорда (без I, L, O, U),
+// группами по 4 символа. Порядок задач сохраняется; опечатку ловит контрольная сумма.
+// ---------------------------------------------------------------------------
+
+const CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const CODE_VERSION = 1;
+const CODE_MAX_TASKS = 2048;
+
+const CODE_CHECK_BITS = 15;
+const CODE_CHECK_MOD = 32749; // простое < 2^15
+
+function codeChecksum(width, ids) {
+  let hash = (CODE_VERSION * 31 + width) % CODE_CHECK_MOD;
+  hash = (hash * 131 + ids.length) % CODE_CHECK_MOD;
+  for (const id of ids) hash = (hash * 131 + id) % CODE_CHECK_MOD;
+  return hash;
+}
+
+function encodePickCode(ids) {
+  if (!ids.length) throw new Error("Подборка пуста");
+  if (ids.length > CODE_MAX_TASKS) throw new Error(`В подборке больше ${CODE_MAX_TASKS} задач`);
+  const width = Math.max(...ids.map((id) => id.toString(2).length));
+  if (width > 16) throw new Error("Слишком большой номер задачи");
+
+  const bits = [];
+  const push = (value, size) => {
+    for (let i = size - 1; i >= 0; i--) bits.push((value >> i) & 1);
+  };
+  push(CODE_VERSION, 5);
+  push(width - 1, 4);
+  push(ids.length - 1, 11);
+  ids.forEach((id) => push(id, width));
+  push(codeChecksum(width, ids), CODE_CHECK_BITS);
+  while (bits.length % 5) bits.push(0);
+
+  let code = "";
+  for (let i = 0; i < bits.length; i += 5) {
+    code += CODE_ALPHABET[bits.slice(i, i + 5).reduce((acc, bit) => acc * 2 + bit, 0)];
+  }
+  return code.match(/.{1,4}/g).join("-");
+}
+
+function decodePickCode(raw) {
+  const clean = String(raw || "").toUpperCase().replace(/[\s\-_.]/g, "")
+    .replace(/O/g, "0").replace(/[IL]/g, "1");
+  if (!clean) throw new Error("Введите код");
+
+  const bits = [];
+  for (const ch of clean) {
+    const value = CODE_ALPHABET.indexOf(ch);
+    if (value < 0) throw new Error(`Недопустимый символ «${ch}»`);
+    for (let i = 4; i >= 0; i--) bits.push((value >> i) & 1);
+  }
+  let pos = 0;
+  const read = (size) => {
+    if (pos + size > bits.length) throw new Error("Код обрезан — проверьте, что скопирован целиком");
+    let value = 0;
+    for (let i = 0; i < size; i++) value = value * 2 + bits[pos++];
+    return value;
+  };
+
+  if (read(5) !== CODE_VERSION) throw new Error("Неизвестная версия кода");
+  const width = read(4) + 1;
+  const count = read(11) + 1;
+  const ids = [];
+  for (let i = 0; i < count; i++) ids.push(read(width));
+  if (read(CODE_CHECK_BITS) !== codeChecksum(width, ids)) throw new Error("Код с ошибкой — проверьте символы");
+  if (bits.length - pos >= 5 || bits.slice(pos).some(Boolean)) throw new Error("Код с ошибкой — лишние символы");
+  if (ids.some((id) => id < 1) || new Set(ids).size !== ids.length) throw new Error("Код с ошибкой");
+  return ids;
+}
+
+// ---------------------------------------------------------------------------
+// Подборка: хранится в браузере (localStorage), синхронизируется между вкладками
+// ---------------------------------------------------------------------------
+
+const Pick = {
+  key: "fipi.pick.v1",
+  listeners: [],
+
+  ids() {
+    try {
+      const data = JSON.parse(localStorage.getItem(this.key) || "[]");
+      return Array.isArray(data) ? data.filter((n) => Number.isInteger(n) && n > 0) : [];
+    } catch {
+      return this._memory || [];
+    }
+  },
+
+  set(ids) {
+    try {
+      localStorage.setItem(this.key, JSON.stringify([...new Set(ids)]));
+    } catch {
+      /* приватный режим и т. п. — подборка просто не сохранится между визитами */
+      this._memory = [...new Set(ids)];
+    }
+    this.emit();
+  },
+
+  has(id) { return this.ids().includes(id); },
+
+  toggle(id, on) {
+    const ids = this.ids().filter((n) => n !== id);
+    if (on) ids.push(id);
+    this.set(ids);
+  },
+
+  code() { return encodePickCode(this.ids()); },
+  onChange(fn) { this.listeners.push(fn); },
+  emit() { this.listeners.forEach((fn) => fn(this.ids())); },
+};
+
+window.addEventListener("storage", (event) => event.key === Pick.key && Pick.emit());
+
+function syncPickChecks(root = document) {
+  const ids = new Set(Pick.ids());
+  root.querySelectorAll("input[data-pick]").forEach((box) => {
+    box.checked = ids.has(Number(box.dataset.pick));
+  });
+}
+
+function pickCheckbox(id) {
+  return `<label class="check pick-check"><input type="checkbox" data-pick="${id}"${Pick.has(id) ? " checked" : ""}> В подборку</label>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +256,7 @@ function taskCard(t) {
       ${solution}
       <div class="meta-grid">${meta.join("")}</div>
       <div class="card-actions">
+        ${pickCheckbox(t.id)}
         ${isAdmin() ? `<a class="button small ghost" href="${t.url}#solution">${t.answer || t.solution ? "Редактировать решение" : "Добавить решение"}</a>` : ""}
         <a class="button small" href="${t.url}">Открыть задачу</a>
       </div>
@@ -136,8 +270,22 @@ function setupTaskList(form) {
   const pageInfo = document.querySelector("[data-page-info]");
   const exportForm = document.getElementById("export");
   const exportCount = document.querySelector("[data-export-count]");
+  const banner = document.getElementById("pick-banner");
   let tasks = [];
   let page = 1;
+  let pickMode = false;
+
+  function shownTasks() {
+    if (!pickMode) return filterTasks(tasks, currentFilters());
+    const byId = new Map(tasks.map((t) => [t.id, t]));
+    return Pick.ids().map((id) => byId.get(id)).filter(Boolean);
+  }
+
+  function setPickMode(on) {
+    pickMode = on;
+    page = 1;
+    render({ scroll: on });
+  }
 
   function currentFilters() {
     const f = {};
@@ -151,26 +299,31 @@ function setupTaskList(form) {
     const perPage = form.elements.per_page.value;
     if (perPage !== "20") params.set("per_page", perPage);
     if (page > 1) params.set("page", page);
+    if (pickMode) params.set("view", "pick");
     const query = params.toString();
     history.replaceState(null, "", query ? `?${query}` : location.pathname);
   }
 
   function render({ scroll = false } = {}) {
     const f = currentFilters();
-    const filtered = filterTasks(tasks, f);
+    const filtered = shownTasks();
     const perPage = Number(form.elements.per_page.value) || 20;
     const pages = Math.max(Math.ceil(filtered.length / perPage), 1);
     page = Math.min(Math.max(page, 1), pages);
     const current = filtered.slice((page - 1) * perPage, page * perPage);
+    const count = plural(filtered.length, "задача", "задачи", "задач");
 
-    totalEl.textContent = `Найдено: ${filtered.length}`;
+    banner.hidden = !pickMode;
+    form.classList.toggle("is-muted", pickMode);
+    totalEl.textContent = pickMode ? `В подборке: ${filtered.length}` : `Найдено: ${filtered.length}`;
     pageInfo.textContent = `Страница ${page} из ${pages}`;
-    exportCount.textContent = `${plural(filtered.length, "задача", "задачи", "задач")} по текущим фильтрам`;
+    exportCount.textContent = pickMode ? `${count} из подборки` : `${count} по текущим фильтрам`;
     exportForm.querySelectorAll("button").forEach((b) => (b.disabled = !filtered.length));
 
-    list.innerHTML = current.length
-      ? current.map(taskCard).join("")
+    const empty = pickMode
+      ? '<div class="empty"><strong>Подборка пуста</strong><span>Отмечайте задачи галочкой «В подборку» или откройте подборку по коду.</span></div>'
       : '<div class="empty"><strong>Ничего не найдено</strong><span>Попробуй изменить фильтры или поисковый запрос.</span></div>';
+    list.innerHTML = current.length ? current.map(taskCard).join("") : empty;
     renderMath(list);
 
     pagination.hidden = pages <= 1;
@@ -188,6 +341,24 @@ function setupTaskList(form) {
     if (form.elements[key] && initial.get(key)) form.elements[key].value = initial.get(key);
   });
   page = Number(initial.get("page")) || 1;
+  pickMode = initial.get("view") === "pick";
+
+  // Ссылка вида ?set=КОД открывает чужую подборку
+  if (initial.get("set")) {
+    try {
+      const ids = decodePickCode(initial.get("set"));
+      const current = Pick.ids();
+      const same = current.length === ids.length && current.every((id, i) => id === ids[i]);
+      if (!current.length || same ||
+          confirm(`Заменить вашу подборку (${plural(current.length, "задача", "задачи", "задач")}) подборкой из ссылки (${plural(ids.length, "задача", "задачи", "задач")})?`)) {
+        Pick.set(ids);
+        pickMode = true;
+        page = 1;
+      }
+    } catch (err) {
+      alert("Не удалось открыть подборку из ссылки: " + err.message);
+    }
+  }
 
   // На телефоне второстепенные фильтры свёрнуты; раскрываем, если какой-то уже задан
   const toggle = form.querySelector("[data-filters-toggle]");
@@ -202,6 +373,7 @@ function setupTaskList(form) {
   let searchTimer = null;
   form.addEventListener("input", (event) => {
     page = 1;
+    pickMode = false; // тронули фильтр — значит, хотят искать по всей базе
     if (event.target.name === "q") {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(render, 200);
@@ -210,7 +382,7 @@ function setupTaskList(form) {
     }
   });
   form.addEventListener("submit", (event) => event.preventDefault());
-  form.addEventListener("reset", () => setTimeout(() => { page = 1; render(); }));
+  form.addEventListener("reset", () => setTimeout(() => { page = 1; pickMode = false; render(); }));
 
   pagination.addEventListener("click", (event) => {
     const dir = event.target.closest("[data-page]")?.dataset.page;
@@ -219,12 +391,19 @@ function setupTaskList(form) {
     render({ scroll: true });
   });
 
+  Pick.onChange(() => (pickMode ? render() : syncPickChecks(list)));
+  banner.querySelector('[data-action="show-all"]').addEventListener("click", () => setPickMode(false));
+
   exportForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const params = new URLSearchParams();
-    const f = currentFilters();
-    FILTER_KEYS.forEach((key) => f[key] && params.set(key, f[key]));
-    ["solutions", "answers"].forEach((key) => exportForm.elements[key].checked && params.set(key, "1"));
+    if (pickMode) {
+      params.set("set", Pick.code());
+    } else {
+      const f = currentFilters();
+      FILTER_KEYS.forEach((key) => f[key] && params.set(key, f[key]));
+    }
+    PRINT_OPTIONS.forEach((key) => exportForm.elements[key].checked && params.set(key, "1"));
     const mode = event.submitter?.dataset.export || "print";
     let url;
     if (mode === "pdf") {
@@ -242,73 +421,118 @@ function setupTaskList(form) {
       totalEl.textContent = "Не удалось загрузить задачи";
       list.innerHTML = `<div class="empty"><strong>Ошибка загрузки</strong><span>${escapeHtml(err.message)}</span></div>`;
     });
+
+  return { showPick: () => setPickMode(true) };
 }
 
 // ---------------------------------------------------------------------------
 // Версия для печати / PDF
 // ---------------------------------------------------------------------------
 
+// Клетка для решения: задачи с развёрнутым ответом (вторая часть) — целая страница,
+// остальные (первая часть, краткий ответ) — половина страницы.
+const isPartTwo = (t) => t.type === "Развернутый ответ";
+
+function printTaskHtml(t, index, opts) {
+  let solution = "";
+  if (opts.solutions) {
+    solution = t.answer || t.solution
+      ? `<div class="solution">
+           <div class="solution-title">Решение</div>
+           <div class="math-text">${t.solution}</div>
+           ${t.answer ? `<p class="answer"><strong>Ответ:</strong> <span class="math-text">${escapeHtml(t.answer)}</span></p>` : ""}
+         </div>`
+      : '<div class="solution"><p class="muted">Решение пока не добавлено.</p></div>';
+  }
+  const grid = opts.grid
+    ? `<div class="work-grid ${isPartTwo(t) ? "work-grid-page" : "work-grid-half"}" aria-hidden="true"></div>`
+    : "";
+  return `
+    <article class="task ${opts.grid ? (isPartTwo(t) ? "task-part-two" : "task-with-grid") : ""}">
+      <div class="task-label">
+        <strong>${index + 1}.</strong>
+        ${opts.showNumber ? `<span>${escapeHtml(t.title)}</span>` : ""}
+        <code>${escapeHtml(t.guid)}</code>
+      </div>
+      <div class="statement">${t.html}</div>
+      ${grid}
+      ${solution}
+    </article>`;
+}
+
 async function setupPrintPage(body) {
   const params = new URLSearchParams(location.search);
-  const f = readParams();
-  const withSolutions = params.get("solutions") === "1";
-  const withAnswers = params.get("answers") === "1";
   const container = document.getElementById("print-tasks");
   const subtitle = document.querySelector("[data-doc-sub]");
+  const answersBlock = document.getElementById("print-answers");
+  const optionsForm = document.querySelector("[data-print-options]");
 
   document.querySelector('[data-action="print"]').addEventListener("click", () => window.print());
 
-  let tasks;
+  let all;
   try {
-    tasks = filterTasks(await loadTasks(body.dataset.tasksUrl), f);
+    all = await loadTasks(body.dataset.tasksUrl);
   } catch (err) {
     subtitle.textContent = "Не удалось загрузить задачи: " + err.message;
     return;
   }
 
-  const title = selectionTitle(f);
-  document.title = title + (withSolutions ? " — с решениями" : "");
-  document.querySelector("[data-doc-title]").textContent = title;
-  subtitle.textContent = [
-    plural(tasks.length, "задача", "задачи", "задач"),
-    withSolutions ? "с решениями" : "",
-    "открытый банк ФИПИ",
-    new Date().toLocaleDateString("ru-RU"),
-  ].filter(Boolean).join(" · ");
-
-  const showNumber = !f.number;
-  container.innerHTML = tasks.map((t, i) => {
-    let solution = "";
-    if (withSolutions) {
-      solution = t.answer || t.solution
-        ? `<div class="solution">
-             <div class="solution-title">Решение</div>
-             <div class="math-text">${t.solution}</div>
-             ${t.answer ? `<p class="answer"><strong>Ответ:</strong> <span class="math-text">${escapeHtml(t.answer)}</span></p>` : ""}
-           </div>`
-        : '<div class="solution"><p class="muted">Решение пока не добавлено.</p></div>';
+  // Что печатаем: подборку по коду (в её порядке) или результат фильтров
+  let tasks, title, code = "";
+  const f = readParams();
+  if (params.get("set")) {
+    try {
+      const ids = decodePickCode(params.get("set"));
+      code = encodePickCode(ids); // нормализованный вид для подписи на листе
+      const byId = new Map(all.map((t) => [t.id, t]));
+      tasks = ids.map((id) => byId.get(id)).filter(Boolean);
+      title = "Подборка задач";
+    } catch (err) {
+      subtitle.textContent = "Не удалось открыть подборку: " + err.message;
+      return;
     }
-    return `
-      <article class="task">
-        <div class="task-label">
-          <strong>${i + 1}.</strong>
-          ${showNumber ? `<span>${escapeHtml(t.title)}</span>` : ""}
-          <code>${escapeHtml(t.guid)}</code>
-        </div>
-        <div class="statement">${t.html}</div>
-        ${solution}
-      </article>`;
-  }).join("");
+  } else {
+    tasks = filterTasks(all, f);
+    title = selectionTitle(f);
+  }
+  const numbers = new Set(tasks.map((t) => t.n));
 
-  if (withAnswers) {
-    const answers = document.getElementById("print-answers");
-    answers.querySelector("tbody").innerHTML = tasks.map((t, i) =>
-      `<tr><td class="num">${i + 1}</td><td class="math-text">${escapeHtml(t.answer || "—")}</td></tr>`
-    ).join("");
-    answers.hidden = false;
+  PRINT_OPTIONS.forEach((key) => (optionsForm.elements[key].checked = params.get(key) === "1"));
+
+  function render() {
+    const opts = { showNumber: numbers.size > 1 };
+    PRINT_OPTIONS.forEach((key) => (opts[key] = optionsForm.elements[key].checked));
+
+    document.title = title + (opts.solutions ? " — с решениями" : "");
+    document.querySelector("[data-doc-title]").textContent = title;
+    subtitle.textContent = [
+      plural(tasks.length, "задача", "задачи", "задач"),
+      opts.solutions ? "с решениями" : "",
+      code ? `код подборки ${code}` : "",
+      "открытый банк ФИПИ",
+      new Date().toLocaleDateString("ru-RU"),
+    ].filter(Boolean).join(" · ");
+
+    container.innerHTML = tasks.map((t, i) => printTaskHtml(t, i, opts)).join("");
+
+    answersBlock.hidden = !opts.answers;
+    answersBlock.querySelector("tbody").innerHTML = opts.answers
+      ? tasks.map((t, i) =>
+          `<tr><td class="num">${i + 1}</td><td class="math-text">${escapeHtml(t.answer || "—")}</td></tr>`
+        ).join("")
+      : "";
+
+    renderMath(document.body);
+
+    // Опции живут в адресе — ссылку на лист можно переслать как есть
+    const next = new URLSearchParams(location.search);
+    PRINT_OPTIONS.forEach((key) => (opts[key] ? next.set(key, "1") : next.delete(key)));
+    next.delete("print");
+    history.replaceState(null, "", `?${next}`);
   }
 
-  renderMath(document.body);
+  optionsForm.addEventListener("change", render);
+  render();
 
   // Ждём картинки и шрифты, чтобы в PDF ничего не пропало
   await Promise.all([...document.images].map((img) =>
@@ -317,6 +541,113 @@ async function setupPrintPage(body) {
   if (document.fonts) await document.fonts.ready;
   body.dataset.ready = "1";
   if (params.get("print") === "1") window.print();
+}
+
+// ---------------------------------------------------------------------------
+// Панель подборки (внизу экрана) и окно с кодом
+// ---------------------------------------------------------------------------
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Старые браузеры / http без clipboard API
+    const area = Object.assign(document.createElement("textarea"), { value: text });
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  }
+}
+
+function setupPickBar(bar, { onShow } = {}) {
+  const dialog = document.getElementById("pick-dialog");
+  const countEl = bar.querySelector("[data-pick-count]");
+  const codeEl = dialog.querySelector("[data-code]");
+  const codeInput = dialog.querySelector('input[name="code"]');
+  const codeError = dialog.querySelector("[data-code-error]");
+  const copyStatus = dialog.querySelector("[data-copy-status]");
+  const indexUrl = new URL(bar.dataset.indexUrl, location.href);
+  const showUrl = (params) => `${indexUrl.pathname}?${params}`;
+
+  function update(ids = Pick.ids()) {
+    countEl.textContent = plural(ids.length, "задача", "задачи", "задач");
+    bar.classList.toggle("is-empty", !ids.length);
+    bar.querySelectorAll("[data-needs-pick]").forEach((b) => (b.disabled = !ids.length));
+    syncPickChecks();
+  }
+
+  function openDialog(mode) {
+    dialog.querySelector("[data-dialog-save]").hidden = mode !== "save";
+    dialog.querySelector("[data-dialog-open]").hidden = mode !== "open";
+    copyStatus.textContent = "";
+    codeError.textContent = "";
+    if (mode === "save") codeEl.textContent = Pick.code();
+    if (mode === "open") codeInput.value = "";
+    dialog.showModal();
+    if (mode === "open") codeInput.focus();
+  }
+
+  function applyCode() {
+    let ids;
+    try {
+      ids = decodePickCode(codeInput.value);
+    } catch (err) {
+      codeError.textContent = err.message;
+      return;
+    }
+    const current = Pick.ids();
+    if (current.length && !confirm(`Заменить текущую подборку (${plural(current.length, "задача", "задачи", "задач")}) новой (${plural(ids.length, "задача", "задачи", "задач")})?`)) {
+      return;
+    }
+    Pick.set(ids);
+    dialog.close();
+    onShow ? onShow() : (location.href = showUrl("view=pick"));
+  }
+
+  document.addEventListener("change", (event) => {
+    const box = event.target.closest("input[data-pick]");
+    if (box) Pick.toggle(Number(box.dataset.pick), box.checked);
+  });
+
+  bar.addEventListener("click", (event) => {
+    const action = event.target.closest("[data-action]")?.dataset.action;
+    if (action === "pick-show") onShow ? onShow() : (location.href = showUrl("view=pick"));
+    if (action === "pick-print") {
+      const url = new URL(bar.dataset.printUrl, location.href);
+      url.searchParams.set("set", Pick.code());
+      window.open(url, "_blank", "noopener");
+    }
+    if (action === "pick-save") openDialog("save");
+    if (action === "pick-open") openDialog("open");
+    if (action === "pick-clear" && confirm("Очистить подборку?")) Pick.set([]);
+  });
+
+  dialog.addEventListener("click", async (event) => {
+    const action = event.target.closest("[data-action]")?.dataset.action;
+    const code = codeEl.textContent;
+    if (action === "copy-code") {
+      copyStatus.textContent = (await copyText(code)) ? "Код скопирован" : "Не удалось скопировать";
+    }
+    if (action === "copy-link") {
+      const link = new URL(indexUrl);
+      link.search = `?set=${code}`;
+      copyStatus.textContent = (await copyText(link.href)) ? "Ссылка скопирована" : "Не удалось скопировать";
+    }
+    if (action === "apply-code") applyCode();
+    if (event.target === dialog) dialog.close(); // клик по фону
+  });
+  codeInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      applyCode();
+    }
+  });
+
+  Pick.onChange(update);
+  update();
 }
 
 // ---------------------------------------------------------------------------
@@ -449,7 +780,10 @@ function setupSolutionEditor(card) {
 
 document.addEventListener("DOMContentLoaded", () => {
   const filters = document.getElementById("filters");
-  if (filters) setupTaskList(filters);
+  const taskList = filters ? setupTaskList(filters) : null;
+
+  const pickBar = document.getElementById("pick-bar");
+  if (pickBar) setupPickBar(pickBar, { onShow: taskList && taskList.showPick });
 
   if (document.body.classList.contains("print-page")) {
     setupPrintPage(document.body);

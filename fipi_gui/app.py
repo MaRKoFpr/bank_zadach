@@ -81,6 +81,38 @@ BY_GUID = {t.get("guid"): t for t in TASKS if t.get("guid")}
 
 
 # ---------------------------------------------------------------------------
+# Постоянные номера задач: на них ссылаются коды подборок, поэтому номер,
+# однажды выданный задаче, никогда не меняется. Новые задачи получают
+# следующие номера (в порядке файла), удалённые — свой номер не освобождают.
+# ---------------------------------------------------------------------------
+
+TASK_IDS_FILE = Path(os.environ.get("FIPI_TASK_IDS_FILE", BASE_DIR / "data" / "task_ids.json"))
+
+
+def load_task_ids() -> tuple[dict[str, int], bool]:
+    ids: dict[str, int] = {}
+    if TASK_IDS_FILE.exists():
+        ids = {guid: int(n) for guid, n in json.loads(TASK_IDS_FILE.read_text(encoding="utf-8")).items()}
+    next_id = max(ids.values(), default=0) + 1
+    changed = False
+    for task in TASKS:
+        guid = task.get("guid")
+        if guid and guid not in ids:
+            ids[guid] = next_id
+            next_id += 1
+            changed = True
+    return ids, changed
+
+
+TASK_IDS, _task_ids_changed = load_task_ids()
+if _task_ids_changed and ADMIN:  # публичная сборка файл не трогает — см. предупреждение в freeze.py
+    TASK_IDS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    TASK_IDS_FILE.write_text(
+        json.dumps(TASK_IDS, ensure_ascii=False, indent=0, sort_keys=False), encoding="utf-8"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Решения: эталонные (read-only файл) + правки пользователя (solutions.json)
 # ---------------------------------------------------------------------------
 
@@ -391,6 +423,7 @@ def task_payload(task: dict) -> dict:
     props = task.get("properties") or {}
     sol = get_solution(guid) or {}
     item = {
+        "id": TASK_IDS[guid],
         "guid": guid,
         "n": number_label(task),
         "title": number_title(task),
@@ -458,6 +491,7 @@ def task_detail(guid: str):
     return render_template(
         "task.html",
         task=task,
+        task_id=TASK_IDS[guid],
         solution=get_solution(guid),
         title=number_title(task),
         statement=Markup(cached_statement_html(task)),
