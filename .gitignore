@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+dist/
+fipi_gui/dist/
+*.json.tmp
+.claude/

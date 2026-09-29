@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Задача {{ title }} · Банк задач ЕГЭ{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{{ url_for('index') }}" data-back>← К списку задач</a>
+
+<article class="detail-card">
+  <div class="detail-head">
+    <div>
+      <div class="eyebrow">Задача ФИПИ</div>
+      <h1>{{ title }}</h1>
+    </div>
+    <div class="chips">
+      <span class="chip">{{ task.properties.get("Тип ответа", "—") }}</span>
+      {% if admin %}
+        <span class="chip {% if task.classification_status == 'uncertain' %}warning{% else %}success{% endif %}">
+          {{ task.classification_status }} · {{ (task.classification_confidence * 100)|round|int }}%
+        </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <section class="statement statement-large">
+    {{ statement }}
+  </section>
+
+  {% if admin %}
+  <section class="solution-card" id="solution"
+           data-guid="{{ task.guid }}"
+           data-save-url="{{ url_for('save_solution', guid=task.guid) }}"
+           data-preview-url="{{ url_for('preview_solution') }}">
+    <div class="solution-head">
+      <h2>Решение</h2>
+      <div class="solution-tools" data-view>
+        <span class="chip accent-outline" data-edited-chip {% if not (solution and solution.edited) %}hidden{% endif %}>изменено вручную</span>
+        <button class="button small ghost" type="button" data-action="reset"
+                {% if not (solution and solution.edited and solution.has_reference) %}hidden{% endif %}>Вернуть эталон</button>
+        <button class="button small primary" type="button" data-action="edit">
+          {% if solution %}Редактировать{% else %}Добавить решение{% endif %}
+        </button>
+      </div>
+    </div>
+
+    <div data-view>
+      <div class="answer-line" data-answer-line {% if not (solution and solution.answer) %}hidden{% endif %}>
+        <span class="meta-label">Ответ</span>
+        <strong class="math-text" data-answer>{{ solution.answer if solution else "" }}</strong>
+      </div>
+      <div class="solution-body math-text" data-solution-html>
+        {% if solution and solution.solution %}
+          {{ render_solution_text(solution.solution) }}
+        {% else %}
+          <p class="muted">Решения пока нет.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <form class="solution-editor" data-editor hidden>
+      <label class="field">
+        <span class="meta-label">Ответ</span>
+        <input name="answer" value="{{ solution.answer if solution else '' }}" placeholder="Например: 12 или $-\frac{\pi}{2}$">
+      </label>
+      <div class="editor-grid">
+        <label class="field">
+          <span class="meta-label">Текст решения</span>
+          <textarea name="solution" rows="16" spellcheck="true">{{ solution.solution if solution else '' }}</textarea>
+          <small class="hint">
+            Формулы — LaTeX: <code>$x^2$</code> в строке, <code>$$\int_0^1 f(x)\,dx$$</code> отдельной строкой.
+            Пустая строка — новый абзац, <code>**жирный**</code>, строки с <code>- </code> или <code>1. </code> — список.
+            <kbd>Ctrl</kbd>+<kbd>Enter</kbd> — сохранить.
+          </small>
+        </label>
+        <div class="field">
+          <span class="meta-label">Предпросмотр</span>
+          <div class="solution-body preview math-text" data-preview></div>
+        </div>
+      </div>
+      <div class="editor-actions">
+        <span class="save-status" data-status></span>
+        <button class="button ghost" type="button" data-action="cancel">Отмена</button>
+        <button class="button primary" type="submit">Сохранить</button>
+      </div>
+    </form>
+  </section>
+  {% elif solution and (solution.answer or solution.solution) %}
+  <section class="solution-public" id="solution">
+    {% if solution.answer %}
+    <details class="solution-inline">
+      <summary>Показать ответ</summary>
+      <div class="solution-body"><p><strong>Ответ:</strong> <span class="math-text">{{ solution.answer }}</span></p></div>
+    </details>
+    {% endif %}
+    {% if solution.solution %}
+    <details class="solution-inline">
+      <summary>Показать решение</summary>
+      <div class="solution-body math-text">{{ render_solution_text(solution.solution) }}</div>
+    </details>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="detail-meta">
+    <div class="meta-row">
+      <span>Тема (КЭС)</span>
+      <strong>{{ task.properties.get("КЭС", "—") }}</strong>
+    </div>
+    <div class="meta-row">
+      <span>Тип ответа</span>
+      <strong>{{ task.properties.get("Тип ответа", "—") }}</strong>
+    </div>
+    <div class="meta-row">
+      <span>Код задания ФИПИ</span>
+      <code>{{ task.guid }}</code>
+    </div>
+    {% if admin %}
+    <div class="meta-row">
+      <span>Причина классификации</span>
+      <strong>{{ task.classification_reason }}</strong>
+    </div>
+    <div class="meta-row">
+      <span>Схема</span>
+      <code>{{ task.classification_scheme }}</code>
+    </div>
+    {% if solution and solution.updated_at %}
+    <div class="meta-row">
+      <span>Решение изменено</span>
+      <span>{{ solution.updated_at }}</span>
+    </div>
+    {% endif %}
+    {% endif %}
+  </section>
+
+  {% if admin %}
+  <details class="raw-block">
+    <summary>Показать исходный текст</summary>
+    <pre>{{ task.statement_text }}</pre>
+  </details>
+  {% endif %}
+</article>
+{% endblock %}

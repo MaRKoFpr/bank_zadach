@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Банк задач ЕГЭ по профильной математике{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div>
+    <div class="eyebrow">{% if admin %}Режим редактора{% else %}Открытый банк ФИПИ{% endif %}</div>
+    <h1>Задачи ФИПИ по номерам ЕГЭ</h1>
+    <p>Все задания открытого банка, разложенные по номерам профильного ЕГЭ‑2027: поиск, решения и подборки в PDF для печати.</p>
+  </div>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <strong>{{ all_count }}</strong>
+      <span>задач в базе</span>
+    </div>
+    <div class="hero-stat">
+      <strong>{{ solved_count }}</strong>
+      <span>с решением</span>
+    </div>
+  </div>
+</section>
+
+<form class="filters {% if admin %}filters-admin{% endif %}" id="filters" data-tasks-url="{{ url_for('tasks_json') }}">
+  <div class="field field-search">
+    <label for="q">Поиск</label>
+    <input id="q" name="q" type="search" placeholder="Текст условия, тема (КЭС), ответ…" autocomplete="off">
+  </div>
+
+  <div class="field">
+    <label for="number">Номер ЕГЭ</label>
+    <select id="number" name="number">
+      <option value="">Все номера</option>
+      {% for value, label, count in number_options %}
+        <option value="{{ value }}">{{ label }} · {{ count }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {% if admin %}
+  <div class="field field-extra">
+    <label for="status">Статус разметки</label>
+    <select id="status" name="status">
+      <option value="">Любой</option>
+      <option value="confident">Уверенно · {{ status_counts.get("confident", 0) }}</option>
+      <option value="uncertain">На проверку · {{ status_counts.get("uncertain", 0) }}</option>
+    </select>
+  </div>
+  {% endif %}
+
+  <div class="field field-extra">
+    <label for="type">Тип ответа</label>
+    <select id="type" name="type">
+      <option value="">Любой</option>
+      <option value="Краткий ответ">Краткий ответ</option>
+      <option value="Развернутый ответ">Развёрнутый ответ</option>
+    </select>
+  </div>
+
+  <div class="field field-extra">
+    <label for="solution">Решение</label>
+    <select id="solution" name="solution">
+      <option value="">Любое</option>
+      <option value="yes">Есть · {{ solved_count }}</option>
+      <option value="no">Нет · {{ all_count - solved_count }}</option>
+      {% if admin %}<option value="edited">Изменённые мной · {{ edited_count }}</option>{% endif %}
+    </select>
+  </div>
+
+  <div class="field field-small field-extra">
+    <label for="per_page">На странице</label>
+    <select id="per_page" name="per_page">
+      {% for size in [10, 20, 50, 100] %}
+        <option value="{{ size }}" {% if size == 20 %}selected{% endif %}>{{ size }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <button class="button ghost field-extra" type="reset">Сбросить</button>
+  <button class="button ghost filters-toggle" type="button" data-filters-toggle aria-expanded="false">Ещё фильтры</button>
+</form>
+
+<form class="export-bar" id="export" method="get" target="_blank"
+      action="{{ url_for('print_page') }}"
+      {% if pdf_download %}data-pdf-url="{{ url_for('export_pdf') }}"{% endif %}>
+  <div class="export-title">
+    <strong>Подборка в PDF</strong>
+    <span data-export-count>Загрузка…</span>
+  </div>
+  <label class="check"><input type="checkbox" name="solutions" value="1"> с решениями</label>
+  <label class="check"><input type="checkbox" name="answers" value="1"> ответы в конце</label>
+  {% if pdf_download %}
+    <button class="button primary" type="submit" data-export="pdf">Скачать PDF</button>
+    <button class="button ghost" type="submit" data-export="print">Версия для печати</button>
+  {% else %}
+    <button class="button primary" type="submit" data-export="print">PDF / печать</button>
+    <span class="export-note">Откроется версия для печати — выбери «Сохранить как PDF» в окне печати.</span>
+  {% endif %}
+</form>
+
+<div class="results-bar">
+  <strong data-total>Загрузка задач…</strong>
+  <span data-page-info></span>
+</div>
+
+<section class="task-list" id="task-list" aria-live="polite">
+  <noscript>
+    <div class="empty"><strong>Нужен JavaScript</strong><span>Список задач строится в браузере.</span></div>
+  </noscript>
+</section>
+
+<nav class="pagination" id="pagination" hidden>
+  <button class="button ghost" type="button" data-page="prev">← Назад</button>
+  <span data-pages></span>
+  <button class="button ghost" type="button" data-page="next">Вперёд →</button>
+</nav>
+{% endblock %}

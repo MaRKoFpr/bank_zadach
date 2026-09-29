@@ -1,0 +1,154 @@
+@page {
+  size: A4;
+  margin: 14mm 15mm 16mm;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0 auto;
+  max-width: 190mm;
+  color: #111;
+  background: #fff;
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: 12.5pt;
+  line-height: 1.45;
+}
+
+.doc-head {
+  border-bottom: 1.5px solid #111;
+  margin-bottom: 14pt;
+  padding-bottom: 6pt;
+}
+
+.doc-head h1 {
+  margin: 0;
+  font-size: 18pt;
+}
+
+.doc-head p {
+  margin: 2pt 0 0;
+  color: #555;
+  font-size: 10pt;
+}
+
+.task {
+  padding: 8pt 0 10pt;
+  border-bottom: 0.5pt solid #ccc;
+}
+
+.task-label {
+  display: flex;
+  gap: 8pt;
+  align-items: baseline;
+  font-family: Arial, sans-serif;
+  font-size: 10pt;
+  color: #444;
+  break-after: avoid;
+}
+
+.task-label strong {
+  font-size: 12pt;
+  color: #111;
+}
+
+.task-label code {
+  margin-left: auto;
+  font-size: 7.5pt;
+  color: #999;
+}
+
+.statement p { margin: 3pt 0; }
+.statement table { border-collapse: collapse; max-width: 100%; }
+.statement td { vertical-align: top; }
+
+.fipi-img {
+  max-width: 100%;
+  vertical-align: middle;
+  break-inside: avoid;
+}
+
+/* Большие рисунки не должны разрываться между страницами */
+.statement p:has(> span > .fipi-img:only-child),
+.statement p[align="center"] {
+  break-inside: avoid;
+}
+
+.solution {
+  margin-top: 6pt;
+  padding: 6pt 10pt;
+  border-left: 2.5pt solid #2857d6;
+  background: #f5f7fc;
+  font-size: 11.5pt;
+}
+
+.solution p { margin: 3pt 0; }
+.solution ul, .solution ol { margin: 3pt 0; padding-left: 18pt; }
+.solution h4 { margin: 6pt 0 2pt; font-size: 11.5pt; }
+
+.solution-title {
+  font-family: Arial, sans-serif;
+  font-size: 9pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: #2857d6;
+}
+
+.answer { margin-top: 5pt; }
+.muted { color: #888; }
+
+.answers {
+  break-before: page;
+}
+
+.answers h2 { font-size: 16pt; margin: 0 0 8pt; }
+
+.answers table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11pt;
+}
+
+.answers td {
+  border: 0.5pt solid #bbb;
+  padding: 3pt 6pt;
+}
+
+.answers td.num {
+  width: 36pt;
+  text-align: right;
+  font-weight: 700;
+}
+
+.answers tr { break-inside: avoid; }
+
+@media screen {
+  body { padding: 24px 16px 48px; }
+}
+
+.print-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+
+.print-toolbar a { color: #2857d6; }
+
+.print-toolbar button {
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 14px;
+  background: #2857d6;
+  color: #fff;
+  font: 700 14px Arial, sans-serif;
+  cursor: pointer;
+}
+
+@media print {
+  .print-toolbar { display: none; }
+}

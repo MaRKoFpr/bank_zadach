@@ -1,0 +1,55 @@
+# Публикация сайта для учеников на GitHub Pages.
+# Запускается на каждый push в main (и вручную из вкладки Actions).
+# Однократно: Settings → Pages → Source: «GitHub Actions».
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: fipi_gui/requirements.txt
+
+      - run: pip install -r fipi_gui/requirements.txt
+
+      - id: pages
+        uses: actions/configure-pages@v5
+
+      # base_path = "/<repo>" для user.github.io/<repo>, пустой — для своего домена
+      - name: Build static site
+        run: python fipi_gui/freeze.py --out dist --base "${{ steps.pages.outputs.base_path }}"
+        env:
+          PYTHONIOENCODING: utf-8
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

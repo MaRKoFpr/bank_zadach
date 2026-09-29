@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Подборка задач</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='katex/katex.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='print.css') }}">
+  <script defer src="{{ url_for('static', filename='katex/katex.min.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='katex/contrib/auto-render.min.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+<body class="print-page" data-admin="{{ '1' if admin else '0' }}"
+      data-tasks-url="{{ url_for('tasks_json') }}">
+  <div class="print-toolbar">
+    <a href="{{ url_for('index') }}" data-back-to-list>← К списку</a>
+    <button type="button" data-action="print">Печать / сохранить PDF</button>
+  </div>
+
+  <header class="doc-head">
+    <h1 data-doc-title>Подборка задач</h1>
+    <p data-doc-sub>Загрузка…</p>
+  </header>
+
+  <div id="print-tasks"></div>
+
+  <section class="answers" id="print-answers" hidden>
+    <h2>Ответы</h2>
+    <table><tbody></tbody></table>
+  </section>
+</body>
+</html>
